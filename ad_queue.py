@@ -1,5 +1,5 @@
-class Queue:
-    """ Implementa uma fila do tipo FCFS ou LCFS
+class AdQueue:
+    """ Implementa uma fila do tipo FCFS ou LCFS.
     """
     def __init__(self, q_type):
         """ Cria uma nova fila do tipo selecionado.
@@ -10,7 +10,7 @@ class Queue:
         self.q_size = 0
         self.q_members = []
 
-    def is_empty(self):
+    def q_is_empty(self):
         """ Verifica se a fila esta vazia.
 
         :return: Retorna True se vazia, False caso contrario.
@@ -20,21 +20,25 @@ class Queue:
         else:
             return False
 
-    def q_push(self, new_member):
-        """ Insere novo membro na fila. Posicao dependera do tipo da fila.
+    def q_push(self, new_event):
+        """ Insere novo evento na fila. Posicao dependera do tipo da fila. Atualiza os ponteiros dos eventos.
 
-        :param new_member: Novo membro a ser inserido.
+        :param new_event: AdEvent. Novo evento a ser inserido.
         """
-        if self.q_type:
-            self.q_members.append(new_member)
+        if self.q_type:  # Se q_type True, tipo eh FCFS. No caso, evento ingressa no final da fila.
+            if not self.q_is_empty():  # Em FCFS, o antigo ultimo da fila aponta para o novo evento.
+                self.q_members[-1].e_pointer = new_event
+            self.q_members.append(new_event)
         else:
-            self.q_members.insert(0, new_member)
+            if not self.q_is_empty():  # Em LCFS, o novo evento aponta para o antigo 1o da fila.
+                new_event.e_pointer = self.q_members[0]
+            self.q_members.insert(0, new_event)
         self.q_size += 1
 
     def q_pop(self):
-        """ Retira proximo membro da fila.
+        """ Faz a fila andar.
 
-        :return: Membro removido da fila.
+        :return: Evento a ser servido.
         """
         if self.q_size == 0:
             print("Error: attempt to pop empty queue")
