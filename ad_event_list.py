@@ -1,11 +1,11 @@
 class AdEvent:
     """Implementa um evento do simulador, que devera ser incluido numa lista de eventos.
     """
-    def __init__(self, e_time, e_type, e_data):
+    def __init__(self, e_time, e_type, e_data=None):
         """Cria um novo evento com os parametros selecionados.
 
         :param e_time: float. tempo de chegada do evento na lista.
-        :param e_type: int. tipo do evento.
+        :param e_type: int. tipo do evento. 0: chegada de cliente. 1: termino de atendimento.
         :param e_data: dados relacionados ao evento.
         """
         self.e_time = e_time
