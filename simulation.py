@@ -1,6 +1,7 @@
 import exponential
 import ad_event_list
 import time
+import numpy as np
 
 
 class Queue:
@@ -128,6 +129,10 @@ class Simulation:
         self.my_event_list.list_add(first_client)
         self.next_client_id += 1
 
+    def t_student_interval(self):
+        """calcula o intervalo de confianca da t-student
+        """
+
     def run_simulation(self, wait_for_key=False, few_delay=True):
         """Roda a simulacao. Os parametros permitem acompanhar os eventos, seja apertando tecla ou aguardando.
         Se nenhum destes for escolhido, nada sera impresso ao longo.
@@ -137,7 +142,7 @@ class Simulation:
         :param few_delay: boolean. Se True, alguns segundos de atraso serao acrescentados.
         """
 
-        kmin=1000
+        kmin=10
         counter=0
         is_transient=True
         self.add_first_client()
@@ -188,22 +193,18 @@ class Simulation:
         #fora da fase transiente    
         for i in range(self.rounds):
             counter=0
-            start_time_list=[0]*kmin  #lista que gurdara tempos de chegadas 
-            total_time_list=[0]*kmin  #lista que guardara tempos totais no sistema
+            number_of_people_queue_list=[] #lista que ira guardar o total de pessoas na fila
             print("inicio da rodada:", i)
             while counter<kmin:
                 if print_events:
                     print("--------------------")
                 next_event = self.my_event_list.list_pop()
-                #print(next_event.e_data,next_event.e_type,next_event.e_time)
+                print(next_event.e_data,next_event.e_type,next_event.e_time)
                 if next_event.e_type==1:
                     counter+=1
-                self.simulation_time = next_event.e_time
+                self.simulation_time = next_event.e_time 
                 self.deal_with_event(next_event, print_events)
-                if next_event.e_type==0:
-                    start_time_list[next_event.e_data%kmin]=round(self.simulation_time,4)
-                else:
-                    total_time_list[next_event.e_data%kmin]=round(self.simulation_time-start_time_list[next_event.e_data%kmin],4)
+                number_of_people_queue_list.append(self.my_queue.queue_size)
                 if print_events:
                     self.print_information()
                 if few_delay and not wait_for_key:
@@ -212,9 +213,18 @@ class Simulation:
                     print("Press any key to continue...")
                     print()
                     input()
-            print("media da rodada",i," é igual a ")
-            print(sum(total_time_list)/len(total_time_list))
+            est_mean=sum(number_of_people_queue_list)/len(number_of_people_queue_list)
+            var_aux_list=[]
+            for c in number_of_people_queue_list:
+                var_aux_list.append((c-est_mean)**2)
+            est_var=sum(var_aux_list)/(len(var_aux_list)-1)
+            
+            #calculo do intervalo de confianca
 
+            print("media de N rodada",i," é igual a ")
+            print(est_mean)
+            print("variancia de T na rodada",i," é igual a ")
+            print(est_var)
 
 
 if __name__ == "__main__":
@@ -223,6 +233,7 @@ if __name__ == "__main__":
 
 """#todo: eliminar overhead de eventos que entram e não terminam
         intervalos de confiança
+        media e variancia do w de pessoas na fila
         determinar kmin
-        variancia 
+        
 """
