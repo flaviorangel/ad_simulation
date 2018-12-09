@@ -113,8 +113,9 @@ class Simulation:
         if self.server_available:  # inicia atendimento se servidor disponivel
             self.server_available = False
             client_id = self.my_queue.queue_pop()
-            service_end_time = self.simulation_time + self.service.occurence_time()
-            service_end_event = ad_event_list.AdEvent(service_end_time, 1, client_id)
+            service_time=self.service.occurence_time()
+            service_end_time = self.simulation_time + service_time
+            service_end_event = ad_event_list.AdEvent(service_end_time, 1, client_id,self.simulation_time)
             self.my_event_list.list_add(service_end_event)
             if print_flag:
                 print("Service for client ", client_id, " began.")
@@ -142,7 +143,7 @@ class Simulation:
         :param few_delay: boolean. Se True, alguns segundos de atraso serao acrescentados.
         """
 
-        kmin=10
+        kmin=1000
         counter=0
         is_transient=True
         self.add_first_client()
@@ -158,7 +159,7 @@ class Simulation:
         print()
         current_mean=9999999
         prev_mean=1
-        start_time_list_transient=[]
+        start_time_list=[]
         total_time_list_transient=[]
         while is_transient:
             if print_events:
@@ -166,12 +167,12 @@ class Simulation:
             next_event = self.my_event_list.list_pop()
             #print(next_event.e_data,next_event.e_type,next_event.e_time)
             if next_event.e_type==0:
-                start_time_list_transient.append(next_event.e_time)
-                #print(len(start_time_list_transient))
+                start_time_list.append(next_event.e_time)
+                #print(len(start_time_list))
             self.simulation_time = next_event.e_time
             self.deal_with_event(next_event, print_events)
             if next_event.e_type==1:
-                total_time_list_transient.append(self.simulation_time-start_time_list_transient[next_event.e_data])
+                total_time_list_transient.append(self.simulation_time-start_time_list[next_event.e_data])
                 current_mean=sum(total_time_list_transient)/len(total_time_list_transient)
                 #print(len(total_time_list_transient))
                 if abs((current_mean/prev_mean)-1)<=0.00001:
@@ -193,18 +194,23 @@ class Simulation:
         #fora da fase transiente    
         for i in range(self.rounds):
             counter=0
+            wait_time_list=[]
             number_of_people_queue_list=[] #lista que ira guardar o total de pessoas na fila
-            print("inicio da rodada:", i)
+            #print("inicio da rodada:", i)
             while counter<kmin:
                 if print_events:
                     print("--------------------")
                 next_event = self.my_event_list.list_pop()
-                print(next_event.e_data,next_event.e_type,next_event.e_time)
+                #print(next_event.e_data,next_event.e_type,next_event.e_time)
                 if next_event.e_type==1:
                     counter+=1
+                else:
+                    start_time_list.append(next_event.e_time)
                 self.simulation_time = next_event.e_time 
                 self.deal_with_event(next_event, print_events)
-                number_of_people_queue_list.append(self.my_queue.queue_size)
+                if next_event.e_type==1:
+                    number_of_people_queue_list.append(self.my_queue.queue_size)
+                    wait_time_list.append(next_event.serv_begin_time-start_time_list[next_event.e_data])
                 if print_events:
                     self.print_information()
                 if few_delay and not wait_for_key:
@@ -213,19 +219,34 @@ class Simulation:
                     print("Press any key to continue...")
                     print()
                     input()
-            est_mean=sum(number_of_people_queue_list)/len(number_of_people_queue_list)
+            #estatisticas do N
+            est_mean_N=sum(number_of_people_queue_list)/len(number_of_people_queue_list)
+            
             var_aux_list=[]
             for c in number_of_people_queue_list:
-                var_aux_list.append((c-est_mean)**2)
-            est_var=sum(var_aux_list)/(len(var_aux_list)-1)
+                var_aux_list.append((c-est_mean_N)**2)
+            est_var_N=sum(var_aux_list)/(len(var_aux_list)-1)
+            
+            #estatisticas do W
+            est_mean_W=sum(wait_time_list)/len(wait_time_list)
+            
+            var_aux_list=[]
+            for f in wait_time_list:
+                var_aux_list.append((f-est_mean_W)**2)
+            est_var_W=sum(var_aux_list)/(len(var_aux_list)-1)
             
             #calculo do intervalo de confianca
 
-            print("media de N rodada",i," é igual a ")
-            print(est_mean)
-            print("variancia de T na rodada",i," é igual a ")
-            print(est_var)
+            if print_events:
+                print("media de W rodada",i," é igual a ")
+                print(est_mean_W)
+                print("variancia de W na rodada",i," é igual a ")
+                print(est_var_W)
 
+                print("media de N rodada",i," é igual a ")
+                print(est_mean_N)
+                print("variancia de N na rodada",i," é igual a ")
+                print(est_var_N)
 
 if __name__ == "__main__":
     my_simulation = Simulation(True, 1, 0.2)
@@ -233,7 +254,6 @@ if __name__ == "__main__":
 
 """#todo: eliminar overhead de eventos que entram e não terminam
         intervalos de confiança
-        media e variancia do w de pessoas na fila
         determinar kmin
         
 """

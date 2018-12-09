@@ -1,7 +1,7 @@
 class AdEvent:
     """Implementa um evento do simulador, que devera ser incluido numa lista de eventos.
     """
-    def __init__(self, e_time, e_type, e_data=None):
+    def __init__(self, e_time, e_type, e_data=None,serv_begin_time=None):
         """Cria um novo evento com os parametros selecionados.
 
         :param e_time: float. tempo de chegada do evento na lista.
@@ -11,6 +11,7 @@ class AdEvent:
         self.e_time = e_time
         self.e_type = e_type
         self.e_data = e_data
+        self.serv_begin_time = serv_begin_time
         self.e_pointer = None
 
 
