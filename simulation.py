@@ -58,12 +58,13 @@ class Queue:
 
 
 class Simulation:
-    def __init__(self, type_of_queue, average_service_time, average_client_arrival_time):
+    def __init__(self, type_of_queue, average_service_time, average_client_arrival_time,rounds):
         """Define classe de simulacao com os parametros dados.
 
         :param type_of_queue: boolean. True para FCFS ou False para LCFS.
         :param average_service_time: tempo medio de atendimento do servidor.
         :param average_client_arrival_time: tempo medio entre chegadas de clientes.
+        :param rounds: numero de rodadas da simulação
         """
         self.service = exponential.Exponential(1/average_service_time)
         self.client = exponential.Exponential(1/average_client_arrival_time)
@@ -73,6 +74,7 @@ class Simulation:
         self.my_queue = Queue(type_of_queue)
         self.my_event_list = ad_event_list.AdEventList()
         self.next_client_id = 0
+        self.rounds = rounds
 
     def print_information(self):
         print("Simulation time: ", self.simulation_time)
@@ -134,18 +136,42 @@ class Simulation:
                              Desconsidera o atraso no tempo, se houver.
         :param few_delay: boolean. Se True, alguns segundos de atraso serao acrescentados.
         """
+
+        kmin=1000
+        counter=0
+        is_transient=True
         self.add_first_client()
         print("----- SIMULATION STARTED -----")
         print()
         print_events = False
         if wait_for_key or few_delay:
             print_events = True
-        while True:
+
+        #fase transiente
+        #o final da fase transiente será determinado quando a média do tempo total começar a convergir
+        print("-------INICIO DA FASE TRANSIENTE-------")
+        print()
+        current_mean=9999999
+        prev_mean=1
+        start_time_list_transient=[]
+        total_time_list_transient=[]
+        while is_transient:
             if print_events:
                 print("--------------------")
             next_event = self.my_event_list.list_pop()
+            #print(next_event.e_data,next_event.e_type,next_event.e_time)
+            if next_event.e_type==0:
+                start_time_list_transient.append(next_event.e_time)
+                #print(len(start_time_list_transient))
             self.simulation_time = next_event.e_time
             self.deal_with_event(next_event, print_events)
+            if next_event.e_type==1:
+                total_time_list_transient.append(self.simulation_time-start_time_list_transient[next_event.e_data])
+                current_mean=sum(total_time_list_transient)/len(total_time_list_transient)
+                #print(len(total_time_list_transient))
+                if abs((current_mean/prev_mean)-1)<=0.00001:
+                    is_transient=False
+                prev_mean=current_mean
             if print_events:
                 self.print_information()
             if few_delay and not wait_for_key:
@@ -154,8 +180,49 @@ class Simulation:
                 print("Press any key to continue...")
                 print()
                 input()
+        print("-------FINAL DA FASE TRANSIENTE-------")
+        print()
+        print(next_event.e_data)    
+
+
+        #fora da fase transiente    
+        for i in range(self.rounds):
+            counter=0
+            start_time_list=[0]*kmin  #lista que gurdara tempos de chegadas 
+            total_time_list=[0]*kmin  #lista que guardara tempos totais no sistema
+            print("inicio da rodada:", i)
+            while counter<kmin:
+                if print_events:
+                    print("--------------------")
+                next_event = self.my_event_list.list_pop()
+                #print(next_event.e_data,next_event.e_type,next_event.e_time)
+                if next_event.e_type==1:
+                    counter+=1
+                self.simulation_time = next_event.e_time
+                self.deal_with_event(next_event, print_events)
+                if next_event.e_type==0:
+                    start_time_list[next_event.e_data%kmin]=round(self.simulation_time,4)
+                else:
+                    total_time_list[next_event.e_data%kmin]=round(self.simulation_time-start_time_list[next_event.e_data%kmin],4)
+                if print_events:
+                    self.print_information()
+                if few_delay and not wait_for_key:
+                    time.sleep(2)
+                if wait_for_key:
+                    print("Press any key to continue...")
+                    print()
+                    input()
+            print("media da rodada",i," é igual a ")
+            print(sum(total_time_list)/len(total_time_list))
+
 
 
 if __name__ == "__main__":
     my_simulation = Simulation(True, 1, 0.2)
     my_simulation.run_simulation(wait_for_key=True)
+
+"""#todo: eliminar overhead de eventos que entram e não terminam
+        intervalos de confiança
+        determinar kmin
+        variancia 
+"""
