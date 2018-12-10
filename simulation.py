@@ -41,7 +41,7 @@ class Queue:
         if self.type_of_queue or self.queue_size == 0:
             self.clients.append(new_client)
         else:
-            self.clients.insert(0)
+            self.clients.insert(0, new_client)
         self.queue_size += 1
         if print_flag:
             print("inserted ID ", new_client)
@@ -277,19 +277,32 @@ class Simulation:
         print("Variancia do n de pessoas na fila: ", est_var_N_total)
         print("Media do tempo na fila: ", est_mean_W_total)
         print("variancia do tempo na fila: ", est_var_W_total)
-
+        print()
         #calculos dos ICs
 
         #ICs das medias usando T-student
-        n_mean_precision_threshold=est_mean_N_total*required_precision
-        t_percentil=-1*stats.t.ppf((1-IC_interval)/2,self.rounds-1)
+        
+        t_percentil=-1*stats.t.ppf((1-IC_interval)/2,self.rounds-1) #usa a biblioteca scipy e calcula o percentil da t-student
+
+        #IC para media de N de pessoas na fila
+        N_mean_precision_threshold=est_mean_N_total*required_precision
         term2=est_var_N_total/np.sqrt(self.rounds)
         upper_limit_mean_N=est_mean_N_total+(t_percentil*term2)
         lower_limit_mean_N=est_mean_N_total-(t_percentil*term2)
         interval_mean_N=[lower_limit_mean_N,est_mean_N_total,upper_limit_mean_N]
-        print(interval_mean_N)
-        print(t_percentil*term2, n_mean_precision_threshold)
-        
+        print("IC da media do n de pessoas na fila:", interval_mean_N)
+        print("largura obtida e largura desejada:", t_percentil*term2, N_mean_precision_threshold)
+        print("Precisão:", abs((t_percentil*term2/est_mean_N_total)))
+        print()
+        #IC para media do tempo de espera 
+        W_mean_precision_threshold=est_mean_W_total*required_precision
+        term2=est_var_W_total/np.sqrt(self.rounds)
+        upper_limit_mean_W=est_mean_W_total+(t_percentil*term2)
+        lower_limit_mean_W=est_mean_W_total-(t_percentil*term2)
+        interval_mean_W=[lower_limit_mean_W,est_mean_W_total,upper_limit_mean_W]
+        print("IC da media do tempo de espera:", interval_mean_W)
+        print("largura obtida e largura desejada:", t_percentil*term2, W_mean_precision_threshold)
+        print("Precisão:", abs((t_percentil*term2/est_mean_W_total)))
 
 
 
