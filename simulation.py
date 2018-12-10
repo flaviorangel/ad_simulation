@@ -2,6 +2,7 @@ import exponential
 import ad_event_list
 import time
 import numpy as np
+from scipy import stats
 
 
 class Queue:
@@ -134,7 +135,7 @@ class Simulation:
         """calcula o intervalo de confianca da t-student
         """
 
-    def run_simulation(self, wait_for_key=False, few_delay=True):
+    def run_simulation(self, wait_for_key=False, few_delay=True,required_precision=0.05,IC_interval=0.95):
         """Roda a simulacao. Os parametros permitem acompanhar os eventos, seja apertando tecla ou aguardando.
         Se nenhum destes for escolhido, nada sera impresso ao longo.
 
@@ -143,7 +144,8 @@ class Simulation:
         :param few_delay: boolean. Se True, alguns segundos de atraso serao acrescentados.
         """
 
-        kmin=1000
+
+        kmin=3000
         counter=0
         is_transient=True
         self.add_first_client()
@@ -190,6 +192,10 @@ class Simulation:
         print()
         print(next_event.e_data)    
 
+        var_W_list=[]
+        mean_W_list=[]
+        var_N_list=[]
+        mean_N_list=[]
 
         #fora da fase transiente    
         for i in range(self.rounds):
@@ -235,7 +241,10 @@ class Simulation:
                 var_aux_list.append((f-est_mean_W)**2)
             est_var_W=sum(var_aux_list)/(len(var_aux_list)-1)
             
-            #calculo do intervalo de confianca
+            var_W_list.append(est_var_W)
+            mean_W_list.append(est_mean_W)
+            var_N_list.append(est_var_N)
+            mean_N_list.append(est_mean_N)
 
             if print_events:
                 print("media de W rodada",i," é igual a ")
@@ -247,6 +256,42 @@ class Simulation:
                 print(est_mean_N)
                 print("variancia de N na rodada",i," é igual a ")
                 print(est_var_N)
+
+        #calculo da media e variancia entre todas rodadas        
+        est_mean_N_total=sum(mean_N_list)/len(mean_N_list)
+
+        var_aux_list=[]
+        for x in mean_N_list:
+            var_aux_list.append((x-est_mean_N_total)**2)
+        est_var_N_total=sum(var_aux_list)/(len(var_aux_list)-1)
+        
+        est_mean_W_total=sum(mean_W_list)/len(mean_W_list)
+
+        var_aux_list=[]
+        for x in mean_W_list:
+            var_aux_list.append((x-est_mean_W_total)**2)
+        est_var_W_total=sum(var_aux_list)/(len(var_aux_list)-1)
+
+        print("as estatisticas coletadas em ", self.rounds, "rodadas são:")
+        print("Media do n de pessoas na fila: ", est_mean_N_total)
+        print("Variancia do n de pessoas na fila: ", est_var_N_total)
+        print("Media do tempo na fila: ", est_mean_W_total)
+        print("variancia do tempo na fila: ", est_var_W_total)
+
+        #calculos dos ICs
+
+        #ICs das medias usando T-student
+        n_mean_precision_threshold=est_mean_N_total*required_precision
+        t_percentil=-1*stats.t.ppf((1-IC_interval)/2,self.rounds-1)
+        term2=est_var_N_total/np.sqrt(self.rounds)
+        upper_limit_mean_N=est_mean_N_total+(t_percentil*term2)
+        lower_limit_mean_N=est_mean_N_total-(t_percentil*term2)
+        interval_mean_N=[lower_limit_mean_N,est_mean_N_total,upper_limit_mean_N]
+        print(interval_mean_N)
+        print(t_percentil*term2, n_mean_precision_threshold)
+        
+
+
 
 if __name__ == "__main__":
     my_simulation = Simulation(True, 1, 0.2)
