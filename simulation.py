@@ -73,6 +73,7 @@ class Simulation:
         self.simulation_time = 0
         self.server_available = True
         self.client_in_queue = False
+        self.type_of_queue=type_of_queue
         self.my_queue = Queue(type_of_queue)
         self.my_event_list = ad_event_list.AdEventList()
         self.next_client_id = 0
@@ -135,7 +136,7 @@ class Simulation:
         """calcula o intervalo de confianca da t-student
         """
 
-    def run_simulation(self, wait_for_key=False, few_delay=True,required_precision=0.05,IC_interval=0.95):
+    def run_simulation(self, wait_for_key=False, few_delay=True,required_precision=0.05,IC_interval=0.05):
         """Roda a simulacao. Os parametros permitem acompanhar os eventos, seja apertando tecla ou aguardando.
         Se nenhum destes for escolhido, nada sera impresso ao longo.
 
@@ -144,8 +145,10 @@ class Simulation:
         :param few_delay: boolean. Se True, alguns segundos de atraso serao acrescentados.
         """
 
-
-        kmin=3000
+        if self.type_of_queue: 
+            kmin=2750
+        else:
+            kmin=3000
         counter=0
         is_transient=True
         self.add_first_client()
@@ -261,28 +264,40 @@ class Simulation:
         est_mean_N_total=sum(mean_N_list)/len(mean_N_list)
 
         var_aux_list=[]
-        for x in mean_N_list:
+        for x in mean_N_list: #calculando variancia das medias
             var_aux_list.append((x-est_mean_N_total)**2)
         est_var_N_total=sum(var_aux_list)/(len(var_aux_list)-1)
         
         est_mean_W_total=sum(mean_W_list)/len(mean_W_list)
 
         var_aux_list=[]
-        for x in mean_W_list:
+        for x in mean_W_list: #calculando variancia das medias
             var_aux_list.append((x-est_mean_W_total)**2)
         est_var_W_total=sum(var_aux_list)/(len(var_aux_list)-1)
 
         print("as estatisticas coletadas em ", self.rounds, "rodadas são:")
-        print("Media do n de pessoas na fila: ", est_mean_N_total)
-        print("Variancia do n de pessoas na fila: ", est_var_N_total)
         print("Media do tempo na fila: ", est_mean_W_total)
         print("variancia do tempo na fila: ", est_var_W_total)
+        print("Media do n de pessoas na fila: ", est_mean_N_total)
+        print("Variancia do n de pessoas na fila: ", est_var_N_total)
         print()
         #calculos dos ICs
 
         #ICs das medias usando T-student
         
-        t_percentil=-1*stats.t.ppf((1-IC_interval)/2,self.rounds-1) #usa a biblioteca scipy e calcula o percentil da t-student
+        t_percentil=stats.t.ppf(1-(IC_interval/2),self.rounds-1) #usa a biblioteca scipy e calcula o percentil da t-student
+        print(t_percentil)
+        
+        #IC para media do tempo de espera 
+        W_mean_precision_threshold=est_mean_W_total*required_precision
+        term2=est_var_W_total/np.sqrt(self.rounds)
+        upper_limit_mean_W=est_mean_W_total+(t_percentil*term2)
+        lower_limit_mean_W=est_mean_W_total-(t_percentil*term2)
+        interval_mean_W=[lower_limit_mean_W,est_mean_W_total,upper_limit_mean_W]
+        print("IC da media do tempo de espera:", interval_mean_W)
+        print("largura obtida e largura desejada:", t_percentil*term2, W_mean_precision_threshold)
+        print("Precisão:", abs((t_percentil*term2/est_mean_W_total)))
+        print()
 
         #IC para media de N de pessoas na fila
         N_mean_precision_threshold=est_mean_N_total*required_precision
@@ -293,25 +308,54 @@ class Simulation:
         print("IC da media do n de pessoas na fila:", interval_mean_N)
         print("largura obtida e largura desejada:", t_percentil*term2, N_mean_precision_threshold)
         print("Precisão:", abs((t_percentil*term2/est_mean_N_total)))
-        print()
-        #IC para media do tempo de espera 
-        W_mean_precision_threshold=est_mean_W_total*required_precision
-        term2=est_var_W_total/np.sqrt(self.rounds)
-        upper_limit_mean_W=est_mean_W_total+(t_percentil*term2)
-        lower_limit_mean_W=est_mean_W_total-(t_percentil*term2)
-        interval_mean_W=[lower_limit_mean_W,est_mean_W_total,upper_limit_mean_W]
-        print("IC da media do tempo de espera:", interval_mean_W)
-        print("largura obtida e largura desejada:", t_percentil*term2, W_mean_precision_threshold)
-        print("Precisão:", abs((t_percentil*term2/est_mean_W_total)))
+        
 
+        #IC das variancias
+        print("\n=======================\n")
+        #print(max(var_W_list),min(var_W_list))
+        
+        #passo 1: IC da media das variancias por t-student
+        est_var_W_IC=sum(var_W_list)/len(var_W_list) #media das variancias, não variancia das medias
+        #print(est_var_W_IC)
+        var_aux_list=[]
+        for x in var_W_list:
+            var_aux_list.append((x-est_var_W_IC)**2)
+        var_of_var_W=sum(var_aux_list)/(len(var_aux_list)-1)  #variancia da lista de variancias de todas rodadas 
+        #print(var_of_var_W)
+        term2=var_of_var_W/np.sqrt(self.rounds)
+        upper_limit_var_Wt=est_var_W_IC+(t_percentil*term2)
+        lower_limit_var_Wt=est_var_W_IC-(t_percentil*term2)
+        var_IC_tstudent_W=[lower_limit_var_Wt, est_var_W_IC, upper_limit_var_Wt]
+        print("IC por t-student da variancia de W:", var_IC_tstudent_W)
+        #isso ta MUITO errado 
+
+        #IC da variancia de W por chi quadrado
+        chi2_percentil_l=stats.chi2.ppf(1-(IC_interval/2),self.rounds-1)
+        chi2_percentil_u=stats.chi2.ppf(IC_interval/2,self.rounds-1) #usa a biblioteca scipy e calcula o percentil da chi quadrado
+        upper_limit_var_Wchi2=((self.rounds-1)*est_var_W_total)/chi2_percentil_u
+        lower_limit_var_Wchi2=((self.rounds-1)*est_var_W_total)/chi2_percentil_l
+        center_W=lower_limit_var_Wchi2+(upper_limit_var_Wchi2-lower_limit_var_Wchi2)/2
+        chi2_W_IC=[lower_limit_var_Wchi2, center_W, upper_limit_var_Wchi2]
+        print("IC por chi2 da variancia de W:", chi2_W_IC)
+        print((center_W-lower_limit_var_Wchi2)/(center_W/100))
+        print((upper_limit_var_Wchi2-center_W)/(center_W/100))
+
+        #IC da variancia de N por chi qudarado
+        upper_limit_var_Nchi2=((self.rounds-1)*est_var_N_total)/chi2_percentil_u
+        lower_limit_var_Nchi2=((self.rounds-1)*est_var_N_total)/chi2_percentil_l
+        center_N=lower_limit_var_Nchi2+(upper_limit_var_Nchi2-lower_limit_var_Nchi2)/2
+        chi2_N_IC=[lower_limit_var_Nchi2, center_N, upper_limit_var_Nchi2]
+        print("IC por chi2 da variancia de N:", chi2_N_IC)
+        print((center_N-lower_limit_var_Nchi2)/(center_N/100))
+        print((upper_limit_var_Nchi2-center_N)/(center_N/100))        
 
 
 if __name__ == "__main__":
     my_simulation = Simulation(True, 1, 0.2)
     my_simulation.run_simulation(wait_for_key=True)
 
-"""#todo: eliminar overhead de eventos que entram e não terminam
-        intervalos de confiança
-        determinar kmin
+"""#todo: IC da variancia por chi quadrado
+          consertar o IC da variancia por t-student
+
         
 """

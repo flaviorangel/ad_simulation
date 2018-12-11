@@ -1,7 +1,7 @@
 import simulation
 
 if __name__ == "__main__":
-    type_of_queue = True  # True para FCFS e False para LCFS
+    type_of_queue = False  # True para FCFS e False para LCFS
     average_service_time = 1
     average_client_arrival_time = 1/0.9
     rounds=3200
