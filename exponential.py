@@ -5,7 +5,7 @@ import math
 class Exponential:
     def __init__(self, rate):
         self.rate = rate
-        self.my_random = rdn.SystemRandom()
+        self.my_random = rdn.SystemRandom(111111)
 
     def occurence_time(self):
         """Calcula o tempo de ocorrencia da exponencial.

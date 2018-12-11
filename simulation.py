@@ -146,9 +146,11 @@ class Simulation:
         """
 
         if self.type_of_queue: 
-            kmin=2750
+            kmin=2750 #kmin para FCFS determinado experimentalmente
+            print("O tipo de final é FCFS e o kmin será ", kmin)
         else:
-            kmin=3000
+            kmin=3000 #kmin para LCFS determinado experimentalmente
+            print("O tipo de final é LCFS e o kmin será ", kmin)
         counter=0
         is_transient=True
         self.add_first_client()
@@ -193,14 +195,15 @@ class Simulation:
                 input()
         print("-------FINAL DA FASE TRANSIENTE-------")
         print()
-        print(next_event.e_data)    
+        print("numero de eventos na fase transiente:", next_event.e_data, "\n")    
 
         var_W_list=[]
         mean_W_list=[]
         var_N_list=[]
         mean_N_list=[]
 
-        #fora da fase transiente    
+        #fora da fase transiente   
+        #simulação em batch, irá tratar kmin eventos antes de passar para proxima rodada 
         for i in range(self.rounds):
             counter=0
             wait_time_list=[]
@@ -244,6 +247,7 @@ class Simulation:
                 var_aux_list.append((f-est_mean_W)**2)
             est_var_W=sum(var_aux_list)/(len(var_aux_list)-1)
             
+            #adiciona às listas que guardam estatisticas de cada rodada
             var_W_list.append(est_var_W)
             mean_W_list.append(est_mean_W)
             var_N_list.append(est_var_N)
@@ -275,11 +279,14 @@ class Simulation:
             var_aux_list.append((x-est_mean_W_total)**2)
         est_var_W_total=sum(var_aux_list)/(len(var_aux_list)-1)
 
-        print("as estatisticas coletadas em ", self.rounds, "rodadas são:")
+        est_var_W_IC=sum(var_W_list)/len(var_W_list) #media das variancias, não variancia das medias
+        est_var_N_IC=sum(var_N_list)/len(var_N_list)
+
+        print("os estimadores das estatisticas coletadas em ", self.rounds, "rodadas são:")
         print("Media do tempo na fila: ", est_mean_W_total)
-        print("variancia do tempo na fila: ", est_var_W_total)
+        print("variancia do tempo na fila: ", est_var_W_IC)
         print("Media do n de pessoas na fila: ", est_mean_N_total)
-        print("Variancia do n de pessoas na fila: ", est_var_N_total)
+        print("Variancia do n de pessoas na fila: ", est_var_N_IC)
         print()
         #calculos dos ICs
 
@@ -296,7 +303,7 @@ class Simulation:
         interval_mean_W=[lower_limit_mean_W,est_mean_W_total,upper_limit_mean_W]
         print("IC da media do tempo de espera:", interval_mean_W)
         print("largura obtida e largura desejada:", t_percentil*term2, W_mean_precision_threshold)
-        print("Precisão:", abs((t_percentil*term2/est_mean_W_total)))
+        print("Precisão:", abs((t_percentil*term2/est_mean_W_total))*100, "%")
         print()
 
         #IC para media de N de pessoas na fila
@@ -307,7 +314,7 @@ class Simulation:
         interval_mean_N=[lower_limit_mean_N,est_mean_N_total,upper_limit_mean_N]
         print("IC da media do n de pessoas na fila:", interval_mean_N)
         print("largura obtida e largura desejada:", t_percentil*term2, N_mean_precision_threshold)
-        print("Precisão:", abs((t_percentil*term2/est_mean_N_total)))
+        print("Precisão:", abs((t_percentil*term2/est_mean_N_total))*100, "%")
         
 
         #IC das variancias
@@ -315,39 +322,58 @@ class Simulation:
         #print(max(var_W_list),min(var_W_list))
         
         #passo 1: IC da media das variancias por t-student
-        est_var_W_IC=sum(var_W_list)/len(var_W_list) #media das variancias, não variancia das medias
-        #print(est_var_W_IC)
+        #variancia do tempo de espera na fila
         var_aux_list=[]
         for x in var_W_list:
             var_aux_list.append((x-est_var_W_IC)**2)
         var_of_var_W=sum(var_aux_list)/(len(var_aux_list)-1)  #variancia da lista de variancias de todas rodadas 
-        #print(var_of_var_W)
         term2=var_of_var_W/np.sqrt(self.rounds)
         upper_limit_var_Wt=est_var_W_IC+(t_percentil*term2)
         lower_limit_var_Wt=est_var_W_IC-(t_percentil*term2)
         var_IC_tstudent_W=[lower_limit_var_Wt, est_var_W_IC, upper_limit_var_Wt]
         print("IC por t-student da variancia de W:", var_IC_tstudent_W)
-        #isso ta MUITO errado 
 
+        #variancia do numero de pessoas na fila
+        var_aux_list=[]
+        for x in var_N_list:
+            var_aux_list.append((x-est_var_N_IC)**2)
+        var_of_var_N=sum(var_aux_list)/(len(var_aux_list)-1)  #variancia da lista de variancias de todas rodadas 
+        term2=var_of_var_N/np.sqrt(self.rounds)
+        upper_limit_var_Nt=est_var_N_IC+(t_percentil*term2)
+        lower_limit_var_Nt=est_var_N_IC-(t_percentil*term2)
+        var_IC_tstudent_N=[lower_limit_var_Nt, est_var_N_IC, upper_limit_var_Nt]
+        print("IC por t-student da variancia de N:", var_IC_tstudent_N)
+
+        
+        #passo 2: ICs das variancias por chi quadardo
         #IC da variancia de W por chi quadrado
         chi2_percentil_l=stats.chi2.ppf(1-(IC_interval/2),self.rounds-1)
         chi2_percentil_u=stats.chi2.ppf(IC_interval/2,self.rounds-1) #usa a biblioteca scipy e calcula o percentil da chi quadrado
-        upper_limit_var_Wchi2=((self.rounds-1)*est_var_W_total)/chi2_percentil_u
-        lower_limit_var_Wchi2=((self.rounds-1)*est_var_W_total)/chi2_percentil_l
+        upper_limit_var_Wchi2=((self.rounds-1)*est_var_W_IC)/chi2_percentil_u
+        lower_limit_var_Wchi2=((self.rounds-1)*est_var_W_IC)/chi2_percentil_l
         center_W=lower_limit_var_Wchi2+(upper_limit_var_Wchi2-lower_limit_var_Wchi2)/2
         chi2_W_IC=[lower_limit_var_Wchi2, center_W, upper_limit_var_Wchi2]
         print("IC por chi2 da variancia de W:", chi2_W_IC)
-        print((center_W-lower_limit_var_Wchi2)/(center_W/100))
-        print((upper_limit_var_Wchi2-center_W)/(center_W/100))
 
         #IC da variancia de N por chi qudarado
-        upper_limit_var_Nchi2=((self.rounds-1)*est_var_N_total)/chi2_percentil_u
-        lower_limit_var_Nchi2=((self.rounds-1)*est_var_N_total)/chi2_percentil_l
+        upper_limit_var_Nchi2=((self.rounds-1)*est_var_N_IC)/chi2_percentil_u
+        lower_limit_var_Nchi2=((self.rounds-1)*est_var_N_IC)/chi2_percentil_l
         center_N=lower_limit_var_Nchi2+(upper_limit_var_Nchi2-lower_limit_var_Nchi2)/2
         chi2_N_IC=[lower_limit_var_Nchi2, center_N, upper_limit_var_Nchi2]
         print("IC por chi2 da variancia de N:", chi2_N_IC)
-        print((center_N-lower_limit_var_Nchi2)/(center_N/100))
-        print((upper_limit_var_Nchi2-center_N)/(center_N/100))        
+
+        if (est_var_W_IC<=upper_limit_var_Wchi2 and est_var_W_IC>=lower_limit_var_Wchi2) and (center_W<=upper_limit_var_Wt and center_W>=lower_limit_var_Wt):
+            print("sobreposição completa occoreu para W")
+        else:
+            print("erro fatal nos ICs do W")
+        print()
+        if (est_var_N_IC<=upper_limit_var_Nchi2 and est_var_N_IC>=lower_limit_var_Nchi2) and (center_N<=upper_limit_var_Nt and center_N>=lower_limit_var_Nt):
+            print("sobreposição completa occoreu para N")
+        else:
+            print("erro fatal nos ICs do N")
+        print()
+
+        print("Precisão da chi2:",(chi2_percentil_l-chi2_percentil_u)/(chi2_percentil_l+chi2_percentil_u))        
 
 
 if __name__ == "__main__":
