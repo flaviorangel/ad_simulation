@@ -175,13 +175,11 @@ class Simulation:
             #print(next_event.e_data,next_event.e_type,next_event.e_time)
             if next_event.e_type==0:
                 start_time_list.append(next_event.e_time)
-                #print(len(start_time_list))
             self.simulation_time = next_event.e_time
             self.deal_with_event(next_event, print_events)
             if next_event.e_type==1:
                 total_time_list_transient.append(self.simulation_time-start_time_list[next_event.e_data])
                 current_mean=sum(total_time_list_transient)/len(total_time_list_transient)
-                #print(len(total_time_list_transient))
                 if abs((current_mean/prev_mean)-1)<=0.00001:
                     is_transient=False
                 prev_mean=current_mean
@@ -204,16 +202,23 @@ class Simulation:
 
         #fora da fase transiente   
         #simulação em batch, irá tratar kmin eventos antes de passar para proxima rodada 
+        prev_event_time=next_event.e_time
         for i in range(self.rounds):
             counter=0
             wait_time_list=[]
-            number_of_people_queue_list=[] #lista que ira guardar o total de pessoas na fila
-            #print("inicio da rodada:", i)
+            people_in_queue_per_time_list=[]
+            avg_people_in_queue_per_time_list=[]
+            round_start_time=self.simulation_time
+            tot_time=0
             while counter<kmin:
                 if print_events:
                     print("--------------------")
                 next_event = self.my_event_list.list_pop()
-                #print(next_event.e_data,next_event.e_type,next_event.e_time)
+                time_interval=next_event.e_time-prev_event_time
+                area=time_interval*self.my_queue.queue_size
+                people_in_queue_per_time_list.append(area)
+                tot_time+=time_interval
+                avg_people_in_queue_per_time_list.append(area/time_interval)
                 if next_event.e_type==1:
                     counter+=1
                 else:
@@ -221,8 +226,8 @@ class Simulation:
                 self.simulation_time = next_event.e_time 
                 self.deal_with_event(next_event, print_events)
                 if next_event.e_type==1:
-                    number_of_people_queue_list.append(self.my_queue.queue_size)
                     wait_time_list.append(next_event.serv_begin_time-start_time_list[next_event.e_data])
+                prev_event_time=next_event.e_time
                 if print_events:
                     self.print_information()
                 if few_delay and not wait_for_key:
@@ -231,11 +236,11 @@ class Simulation:
                     print("Press any key to continue...")
                     print()
                     input()
+            round_end_time=self.simulation_time
             #estatisticas do N
-            est_mean_N=sum(number_of_people_queue_list)/len(number_of_people_queue_list)
-            
+            est_mean_N=sum(people_in_queue_per_time_list)/(round_end_time-round_start_time)
             var_aux_list=[]
-            for c in number_of_people_queue_list:
+            for c in avg_people_in_queue_per_time_list:
                 var_aux_list.append((c-est_mean_N)**2)
             est_var_N=sum(var_aux_list)/(len(var_aux_list)-1)
             
@@ -293,7 +298,6 @@ class Simulation:
         #ICs das medias usando T-student
         
         t_percentil=stats.t.ppf(1-(IC_interval/2),self.rounds-1) #usa a biblioteca scipy e calcula o percentil da t-student
-        print(t_percentil)
         
         #IC para media do tempo de espera 
         W_mean_precision_threshold=est_mean_W_total*required_precision
@@ -382,6 +386,7 @@ if __name__ == "__main__":
 
 """#todo: IC da variancia por chi quadrado
           consertar o IC da variancia por t-student
+
 
         
 """
