@@ -60,7 +60,7 @@ class Queue:
 
 
 class Simulation:
-    def __init__(self, type_of_queue, average_service_time, average_client_arrival_time,rounds):
+    def __init__(self, type_of_queue, average_service_time, average_client_arrival_time,rounds, kmin):
         """Define classe de simulacao com os parametros dados.
 
         :param type_of_queue: boolean. True para FCFS ou False para LCFS.
@@ -78,6 +78,7 @@ class Simulation:
         self.my_event_list = ad_event_list.AdEventList()
         self.next_client_id = 0
         self.rounds = rounds
+        self.kmin=kmin
 
     def print_information(self):
         print("Simulation time: ", self.simulation_time)
@@ -144,12 +145,10 @@ class Simulation:
                              Desconsidera o atraso no tempo, se houver.
         :param few_delay: boolean. Se True, alguns segundos de atraso serao acrescentados.
         """
-
+        kmin=self.kmin
         if self.type_of_queue: 
-            kmin=2750 #kmin para FCFS determinado experimentalmente
             print("O tipo de final é FCFS e o kmin será ", kmin)
         else:
-            kmin=3000 #kmin para LCFS determinado experimentalmente
             print("O tipo de final é LCFS e o kmin será ", kmin)
         counter=0
         is_transient=True
@@ -209,7 +208,6 @@ class Simulation:
             people_in_queue_per_time_list=[]
             avg_people_in_queue_per_time_list=[]
             round_start_time=self.simulation_time
-            tot_time=0
             while counter<kmin:
                 if print_events:
                     print("--------------------")
@@ -217,8 +215,7 @@ class Simulation:
                 time_interval=next_event.e_time-prev_event_time
                 area=time_interval*self.my_queue.queue_size
                 people_in_queue_per_time_list.append(area)
-                tot_time+=time_interval
-                avg_people_in_queue_per_time_list.append(area/time_interval)
+                avg_people_in_queue_per_time_list.append(self.my_queue.queue_size)
                 if next_event.e_type==1:
                     counter+=1
                 else:
@@ -377,7 +374,7 @@ class Simulation:
             print("erro fatal nos ICs do N")
         print()
 
-        print("Precisão da chi2:",(chi2_percentil_l-chi2_percentil_u)/(chi2_percentil_l+chi2_percentil_u))        
+        print("Precisão da chi2:",((chi2_percentil_l-chi2_percentil_u)/(chi2_percentil_l+chi2_percentil_u))*100, "%")        
 
 
 if __name__ == "__main__":
